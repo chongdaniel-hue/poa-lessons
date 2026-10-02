@@ -844,7 +844,7 @@ function discussionBlock(kind, prompt, hintText, hint2Text){
     ? `<p style="font-style:italic; color:var(--muted);">Think on your own for 30 seconds, then discuss in your group. Be ready to share your group's answer.</p>`
     : '';
   /* Optional second starter: hidden until the first is opened (see initHint2). */
-  const hints = hint2Text
+  const hints = !hintText ? '' : hint2Text
     ? detailsHTML('hint', 'Stuck? Discussion starter 1', `<p>${hintText}</p>`)
       + `<div data-hint2 style="display:none;">${detailsHTML('hint', 'Still stuck? Discussion starter 2', `<p>${hint2Text}</p>`)}</div>`
     : detailsHTML('hint', 'Stuck? Discussion starter', `<p>${hintText}</p>`);
@@ -1406,7 +1406,7 @@ function renderL1Stage1(container){
         + `<div id="s1cards">${S1_CARDS.map(stage1CardHTML).join('')}</div>`
         + `<div class="btnrow"><button class="btn btn-primary" id="s1check">Check our sort</button></div>`,
       init: initStage1Block1 },
-    { html: discussionBlock('group', "Look at your two piles. Is the Q-A pile something the company OWNS, or something it OWES? What about the Q-B pile?", "If the gym shut down tomorrow, who would owe whom: the company or the gym? If the electricity company asked for September's payment today, who would owe whom?")
+    { html: discussionBlock('group', "Look at your two piles. Is the Q-A pile something the company OWNS, or something it OWES? What about the Q-B pile?")
         + `<div class="card sunk section-gap">Write your group's answer to <b>Finding A1</b> in your group's Audit Report (open it from Google Classroom). Use the “Talk it through” questions there if you get stuck.</div>` },
     { html: detailsHTML('teacher', 'The official names · Tap when your teacher says so', `
         <div class="word-box">
@@ -1586,7 +1586,7 @@ function renderL1Debrief(container){
           text:"Good work on the numbers. Before we move on, look at them side by side. Anything strike you?"
         }])
         + `<div class="section-gap">${debriefResultsTableHTML()}</div>`
-        + `<div class="section-gap">${discussionBlock('group', "Look at the results table. For which items is the expense for the year LESS than the amount paid? For which items is it MORE? Why?", "Look at which items were paid for before they were used, and which were used before they were paid for.")}</div>`
+        + `<div class="section-gap">${discussionBlock('group', "Look at the results table. For which items is the expense for the year LESS than the amount paid? For which items is it MORE? Why?")}</div>`
         + `<div class="card sunk section-gap">Write your group's answer to <b>Finding A2</b> in your group's Audit Report (open it from Google Classroom). Use the “Talk it through” questions there if you get stuck.</div>` },
     { html: detailsHTML('teacher', '💭 Tap when your teacher says so', thoughtBubble(
         `<div class="thought-label">You (thinking)</div>
@@ -1613,7 +1613,7 @@ function renderL1Debrief(container){
         </div>
         <p style="color:var(--muted); font-style:italic; margin:16px 0 0;">Remember: incurred = used.</p>
       </div>` },
-    { html: discussionBlock('group', "Imagine the gym shut down tomorrow, just like True Fitness. Our company has paid $1 600 for 8 months of gym it has not used yet. What would happen to that $1 600?", "Remember Ruby Xu from the news? She paid $1,900 for a 1½-year True Fitness package in April. When it shut down, she lost the months she hadn't used yet, and she's now hoping to get that money back. How is our company in the same position?")
+    { html: discussionBlock('group', "Imagine the gym shut down tomorrow, just like True Fitness. Our company has paid $1 600 for 8 months of gym it has not used yet. What would happen to that $1 600?")
       + `<div class="card sunk section-gap">Write your group's answer to <b>Finding A3</b> in your group's Audit Report. Use the “Talk it through” questions there if you get stuck.</div>` }
   ];
   initRevealStage(container, 'l1-debrief', blocks);
@@ -2506,9 +2506,7 @@ function renderL2Stage3(container){
         initExitBlanks(el, KEY);
         el.querySelector('#s3-check').addEventListener('click', ()=> checkS3Claims(el));
       } },
-    { html: discussionBlock('group', "Look at Jay's closing entries. In one sentence, what did Jay do wrong?",
-          'What accounting theory did Jay not follow? Should the Statement of Financial Performance show only the expenses paid, or the expenses incurred?',
-          'What do the Accrual Basis of Accounting and Matching theory say?')
+    { html: discussionBlock('group', "Look at Jay's closing entries. In one sentence, what did Jay do wrong?")
         + `<div class="card sunk section-gap">Write your group's answer to <b>Finding B1</b> in your group's Audit Report (open it from Google Classroom). Use the “Talk it through” questions there if you get stuck.</div>`,
       init(el){ initHint2(el, KEY); } }
   ];
@@ -3062,8 +3060,7 @@ function renderL2Stage5(container){
         initExitBlanks(el, S5_KEY);
         el.querySelector('#s5-eff-check').addEventListener('click', ()=> checkEffects(el));
       } },
-    { html: discussionBlock('group', "Jay's profit for the year ($33 150) is only $200 different from yours ($32 950). So are Jay's financial statements good enough to send to the bank? Why or why not?",
-          'Look at the Statement of Financial Position, not just profit. What would Mr Dietrich, or the bank, NOT know if they only saw Jay\'s version?')
+    { html: discussionBlock('group', "Jay's profit for the year ($33 150) is only $200 different from yours ($32 950). So are Jay's financial statements good enough to send to the bank? Why or why not?")
         + `<div class="card sunk section-gap">Write your group's answer to <b>Finding B2</b> in your group's Audit Report. Use the “Talk it through” questions there if you get stuck.</div>` }
   ];
   initRevealStage(container, S5_KEY, blocks);
