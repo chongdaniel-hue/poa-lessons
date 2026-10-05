@@ -441,6 +441,26 @@ table.ledger tr.mean-row{display:none;}
 .frame textarea.freeform{background:#fff; margin-top:6px; line-height:1.4;}
 .frame label input[type=checkbox]{width:auto; margin-right:4px; vertical-align:middle;}
 .nw{white-space:nowrap;}
+
+/* ---- Visuals (Visuals Addendum v1). Images never sit inside questions, strips, ledgers or journal tables;
+   every image has width/height (or a fixed box) so nothing shifts while it loads. ---- */
+.ev-head{display:flex; align-items:center; gap:12px; margin-bottom:4px;}
+.ev-head h3{margin:0;}
+.ev-icon{flex:0 0 auto; width:56px; height:auto;}
+@media (max-width:599px){ .ev-icon{width:44px;} }
+.news-illus{display:block; width:calc(100% + 36px); height:auto; margin:-18px -18px 0; border-radius:14px 14px 0 0; aspect-ratio:1024/572;}
+.news-illus-cap{font-size:.8rem; color:var(--muted); margin:6px 0 14px;}
+.chatwin-avatar{position:relative; overflow:hidden;}
+.chatwin-avatar img{position:absolute; left:0; top:0; width:100%; height:100%; border-radius:50%; object-fit:cover; display:block;}
+.chatwin-avatar.has-img{background:transparent;}
+.chatwin-avatar.has-img .av-ini{visibility:hidden;}
+.draft-paper{position:relative; background:#FBF8F0; border:1px solid var(--lines); border-radius:6px; box-shadow:0 1px 3px rgba(20,25,34,.12); padding:10px 12px 8px; margin-top:24px;}
+.draft-paper .closing-label{margin:0 96px 8px 0; min-height:40px;}
+.draft-paper table.ledger{background:transparent;}
+.draft-stamp{position:absolute; right:-8px; top:-14px; width:90px; height:auto; aspect-ratio:200/108; pointer-events:none;}
+.progress-strip{display:flex; justify-content:center; align-items:center; gap:12px; height:34px;}
+.progress-strip img{width:28px; height:auto; aspect-ratio:160/155;}
+@media (max-width:599px){ .progress-strip{display:none;} }
 .word-box{background:var(--hint); border:1px solid var(--hint-border); border-radius:10px; padding:12px 14px; margin:0 0 16px;}
 .word-box p:last-child{margin-bottom:0;}
 .decoder{border:2px solid var(--ink);}
@@ -474,6 +494,7 @@ table.ledger tr.mean-row{display:none;}
       <div class="track" id="stepTrack"></div>
       <button class="btn btn-primary navbtn" id="nextBtn">Next →</button>
     </div>
+    <div class="shell progress-strip" id="progressStrip"></div>
     <div id="lockMsg" class="lock-msg"></div>
   </div>
 </div>
@@ -894,9 +915,14 @@ const CHAT_WALLPAPER = 'data:image/svg+xml;base64,' + btoa(
 </svg>`);
 
 const CHAT_PEOPLE = {
-  ceo: {initials:'MD', name:'Mr Dietrich', header:'Mr Dietrich <span class="chatwin-role">(CEO)</span>', avatarClass:''},
-  jay: {initials:'J', name:'Jay', header:'Jay <span class="chatwin-role">(Junior Accountant)</span>', avatarClass:'jay'}
+  ceo: {initials:'MD', img:'images/avatar-dietrich.webp', alt:'Mr Dietrich, the CEO', name:'Mr Dietrich', header:'Mr Dietrich <span class="chatwin-role">(CEO)</span>', avatarClass:''},
+  jay: {initials:'J', img:'images/avatar-jay.webp', alt:'Jay, the junior accountant', name:'Jay', header:'Jay <span class="chatwin-role">(Junior Accountant)</span>', avatarClass:'jay'}
 };
+
+/* Initials circle with the character image on top; the initials stay as a fallback if the image fails. */
+function avatarHTML(p, extraClass){
+  return `<span class="chatwin-avatar ${extraClass||''} ${p.avatarClass}"><span class="av-ini">${p.initials}</span><img src="${p.img}" alt="${p.alt}" width="256" height="256" onload="this.parentNode.classList.add('has-img')" onerror="this.parentNode.classList.remove('has-img');this.remove()"></span>`;
+}
 
 const GROUP_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
 
@@ -917,7 +943,7 @@ function groupChatWindow(groupName, membersLine, messages, unreadCount){
       ${messages.map(m=>{
         const p = CHAT_PEOPLE[m.who];
         return `<div class="chatwin-msg chatwin-msg-group">
-          <span class="chatwin-avatar chatwin-avatar-sm ${p.avatarClass}">${p.initials}</span>
+          ${avatarHTML(p, 'chatwin-avatar-sm')}
           <div class="chatwin-bubble">
             <div class="chatwin-sender ${m.who}">${esc(p.name)}</div>
             ${m.text}
@@ -935,7 +961,7 @@ function chatWindow(messages, opts){
   const unread = opts.unreadCount!==undefined ? opts.unreadCount : messages.length;
   return `<div class="chatwin">
     <div class="chatwin-header">
-      <span class="chatwin-avatar ${person.avatarClass}">${person.initials}</span>
+      ${avatarHTML(person, '')}
       <div class="chatwin-namewrap">
         <div class="chatwin-name">${CHAT_ICON}${person.header}</div>
         <div class="chatwin-online">Online</div>
@@ -1227,6 +1253,7 @@ function renderApp(){
     btn.addEventListener('click', ()=> navigateTo(App.lesson, parseInt(btn.dataset.i,10)));
   });
 
+  renderProgress();
   document.getElementById('backBtn').disabled = App.index===0;
   document.getElementById('nextBtn').disabled = App.index===stages.length-1 || !isStageUnlocked(App.lesson, App.index+1);
 
@@ -1256,7 +1283,18 @@ function renderApp(){
 /* Lightweight refresh of just the tab lock states and Next button, called when a stage
    unlocks mid-page (e.g. the last Continue is opened) so progression updates immediately
    without re-rendering the stage content the student is working in. */
+/* Slim progress strip: one folder per stage, "done" once the stage counts as seen (guided progression). Progress only, never correctness. */
+function renderProgress(){
+  const el = document.getElementById('progressStrip'); if(!el) return;
+  const upto = getUnlockedUpTo(App.lesson);
+  el.innerHTML = stagesFor(App.lesson).map((st,i)=>{
+    const done = upto > i;
+    return `<img src="images/folder-${done?'done':'open'}.webp" alt="${done?'Stage finished':'Stage not finished'}" title="${esc(st.label)}" width="160" height="${done?154:155}">`;
+  }).join('');
+}
+
 function refreshStepperUI(){
+  renderProgress();
   const stages = stagesFor(App.lesson);
   const track = document.getElementById('stepTrack');
   if(track){
@@ -1274,6 +1312,8 @@ function refreshStepperUI(){
 
 function newsCardHTML(){
   return `<div class="news-card">
+    <img class="news-illus" src="images/news-closed-gym.webp" alt="Illustration of a closed gym in a shopping mall, with people standing outside the shutter." width="1024" height="572">
+    <div class="news-illus-cap">Illustration</div>
     <div class="news-headline">True Fitness and True Yoga shut all 7 Singapore outlets</div>
     <div class="news-meta">10 Sep 2026: the parent company put both chains into provisional liquidation. Outlets closed on 11 Sep.</div>
     <div class="stat-callout">CASE received <b>241 complaints</b>, with reported losses of <b>more than S$609 000</b> in unused memberships, packages and services. (Source: CNA)</div>
@@ -1339,10 +1379,12 @@ function renderL1News(container){
 const S1_KEY = 'l1-s1';
 const S1_CARDS = ['gym','insurance','utilities','wages','stationery'];
 
+const EVIDENCE_ALT = {gym:'Gym membership receipt', insurance:'Insurance policy slip', utilities:'Electricity bill', wages:'Payslip summary', stationery:'Stationery shop receipt'};
+const EVIDENCE_DIM = {gym:[206,255], insurance:[203,242], utilities:[202,242], wages:[225,284], stationery:[208,267]};
 function stage1CardHTML(k){
   const ev = EVIDENCE[k];
   return `<div class="evidence-card" data-card="${k}">
-    <h3>${ev.name}</h3>
+    <div class="ev-head"><img class="ev-icon" src="images/evidence-${k}.webp" alt="${EVIDENCE_ALT[k]}" width="${EVIDENCE_DIM[k][0]}" height="${EVIDENCE_DIM[k][1]}"><h3>${ev.name}</h3></div>
     <div class="facts">${ev.stage1Text}</div>
     <div class="sorter">
       <label><input type="radio" name="sort-${k}" value="qa" autocomplete="off"> Q-A: Paid, not used yet</label>
@@ -2286,8 +2328,9 @@ const JAY_LEDGERS = [
 /* One card: the ledger, then directly below it Jay's planned closing entry with a grey
    "Not posted yet" tag. Also used for the memo's two extra accounts. */
 function jayClosingEntryHTML(acct, amt){
-  return `<p class="closing-label"><span class="notposted">(Not Posted Yet)</span> <i>Jay's Journal Entry</i></p>
-    ${journalHTML([{y:'2026'},{d:'Sep 30', p:'Income Summary', dr:amt},{p:acct, cr:amt, indent:true}])}`;
+  return `<div class="draft-paper"><img class="draft-stamp" src="images/stamp-draft.webp" alt="Draft" width="200" height="108">
+    <p class="closing-label"><span class="notposted">(Not Posted Yet)</span> <i>Jay's Journal Entry</i></p>
+    ${journalHTML([{y:'2026'},{d:'Sep 30', p:'Income Summary', dr:amt},{p:acct, cr:amt, indent:true}])}</div>`;
 }
 function jayCardHTML(l, extraHTML){
   return `<div class="ledger-card"><h4>${l.title}</h4>${extraHTML||''}${ledgerHTML('', l.rows, {bare:true})}${jayClosingEntryHTML(l.acct, l.amt)}</div>`;
