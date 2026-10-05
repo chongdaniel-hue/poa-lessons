@@ -348,7 +348,8 @@ input.text-input{border:1px solid var(--lines); border-radius:8px; padding:8px 1
 table.ledger{border-collapse:collapse; width:100%; font-size:.95rem;}
 table.ledger th, table.ledger td{padding:6px 8px; border-bottom:1px solid var(--lines); vertical-align:top;}
 table.ledger th{text-align:left; border-bottom:2px solid var(--ink); font-size:.85rem;}
-table.ledger .num{text-align:right; border-left:1px solid var(--lines);}
+table.ledger .num{text-align:right; border-left:1px solid var(--lines); white-space:nowrap;}
+.amt{white-space:nowrap;}
 table.ledger tr.yr td{font-weight:700;}
 .ledger .ref{color:var(--muted); font-size:.78rem; margin-right:4px;}
 @media (max-width:560px){
@@ -449,6 +450,7 @@ table.ledger tr.mean-row{display:none;}
 .ev-icon{flex:0 0 auto; width:56px; height:auto;}
 @media (max-width:599px){ .ev-icon{width:44px;} }
 .news-illus{display:block; width:calc(100% + 36px); height:auto; margin:-18px -18px 0; border-radius:14px 14px 0 0; aspect-ratio:1024/572;}
+@media (min-width:700px){ .news-illus{height:260px; aspect-ratio:auto; object-fit:cover; object-position:center;} }
 .news-illus-cap{font-size:.8rem; color:var(--muted); margin:6px 0 14px;}
 .chatwin-avatar{position:relative; overflow:hidden;}
 .chatwin-avatar img{position:absolute; left:0; top:0; width:100%; height:100%; border-radius:50%; object-fit:cover; display:block;}
@@ -458,9 +460,8 @@ table.ledger tr.mean-row{display:none;}
 .draft-paper .closing-label{margin:0 96px 8px 0; min-height:40px;}
 .draft-paper table.ledger{background:transparent;}
 .draft-stamp{position:absolute; right:-8px; top:-14px; width:90px; height:auto; aspect-ratio:200/108; pointer-events:none;}
-.progress-strip{display:flex; justify-content:center; align-items:center; gap:12px; height:34px;}
-.progress-strip img{width:28px; height:auto; aspect-ratio:160/155;}
-@media (max-width:599px){ .progress-strip{display:none;} }
+/* A small tick before a stage tab's label once the stage counts as seen (guided progression). */
+.tab-done{font-weight:800; margin-right:3px;}
 .word-box{background:var(--hint); border:1px solid var(--hint-border); border-radius:10px; padding:12px 14px; margin:0 0 16px;}
 .word-box p:last-child{margin-bottom:0;}
 .decoder{border:2px solid var(--ink);}
@@ -494,7 +495,6 @@ table.ledger tr.mean-row{display:none;}
       <div class="track" id="stepTrack"></div>
       <button class="btn btn-primary navbtn" id="nextBtn">Next →</button>
     </div>
-    <div class="shell progress-strip" id="progressStrip"></div>
     <div id="lockMsg" class="lock-msg"></div>
   </div>
 </div>
@@ -790,7 +790,7 @@ function esc(str){
 
 function fmt(n){
   const neg = n<0; n = Math.abs(n);
-  const s = Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const s = Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');   // non-breaking space: a figure never wraps
   return (neg?'−':'')+s;
 }
 
@@ -1247,13 +1247,12 @@ function renderApp(){
   const track = document.getElementById('stepTrack');
   track.innerHTML = stages.map((s,i)=>{
     const unlocked = isStageUnlocked(App.lesson, i);
-    return `<button class="step-tab ${i===App.index?'active':''} ${unlocked?'':'locked'}" data-i="${i}">${unlocked?'':LOCK_ICON}${esc(s.label)}</button>`;
+    return `<button class="step-tab ${i===App.index?'active':''} ${unlocked?'':'locked'}" data-i="${i}">${unlocked?'':LOCK_ICON}${stageSeen(App.lesson,i)?DONE_MARK:''}${esc(s.label)}</button>`;
   }).join('');
   track.querySelectorAll('.step-tab').forEach(btn=>{
     btn.addEventListener('click', ()=> navigateTo(App.lesson, parseInt(btn.dataset.i,10)));
   });
 
-  renderProgress();
   document.getElementById('backBtn').disabled = App.index===0;
   document.getElementById('nextBtn').disabled = App.index===stages.length-1 || !isStageUnlocked(App.lesson, App.index+1);
 
@@ -1283,25 +1282,17 @@ function renderApp(){
 /* Lightweight refresh of just the tab lock states and Next button, called when a stage
    unlocks mid-page (e.g. the last Continue is opened) so progression updates immediately
    without re-rendering the stage content the student is working in. */
-/* Slim progress strip: one folder per stage, "done" once the stage counts as seen (guided progression). Progress only, never correctness. */
-function renderProgress(){
-  const el = document.getElementById('progressStrip'); if(!el) return;
-  const upto = getUnlockedUpTo(App.lesson);
-  el.innerHTML = stagesFor(App.lesson).map((st,i)=>{
-    const done = upto > i;
-    return `<img src="images/folder-${done?'done':'open'}.webp" alt="${done?'Stage finished':'Stage not finished'}" title="${esc(st.label)}" width="160" height="${done?154:155}">`;
-  }).join('');
-}
+const DONE_MARK = '<span class="tab-done" role="img" aria-label="Stage finished">✓</span>';
+function stageSeen(lesson, i){ return getUnlockedUpTo(lesson) > i; }
 
 function refreshStepperUI(){
-  renderProgress();
   const stages = stagesFor(App.lesson);
   const track = document.getElementById('stepTrack');
   if(track){
     track.querySelectorAll('.step-tab').forEach((btn,i)=>{
       const unlocked = isStageUnlocked(App.lesson, i);
       btn.classList.toggle('locked', !unlocked);
-      btn.innerHTML = `${unlocked?'':LOCK_ICON}${esc(stages[i].label)}`;
+      btn.innerHTML = `${unlocked?'':LOCK_ICON}${stageSeen(App.lesson,i)?DONE_MARK:''}${esc(stages[i].label)}`;
     });
   }
   const nextBtn = document.getElementById('nextBtn');
@@ -1608,8 +1599,8 @@ const DEBRIEF_RESULTS = [
 function debriefResultsTableHTML(){
   const rows = DEBRIEF_RESULTS.map(r=>
     `<tr><td style="padding:8px; border-bottom:1px solid var(--lines);">${r.name}</td>
-      <td style="text-align:right; padding:8px; border-bottom:1px solid var(--lines);">$${fmt(r.paid)}</td>
-      <td style="text-align:right; padding:8px; border-bottom:1px solid var(--lines);">$${fmt(r.expense)}</td></tr>`
+      <td class="amt" style="text-align:right; padding:8px; border-bottom:1px solid var(--lines);">$${fmt(r.paid)}</td>
+      <td class="amt" style="text-align:right; padding:8px; border-bottom:1px solid var(--lines);">$${fmt(r.expense)}</td></tr>`
   ).join('');
   return `<div class="scroll-x"><table style="border-collapse:collapse; width:100%; min-width:480px;">
     <tr>
@@ -2256,8 +2247,8 @@ function caseFileTableHTML(){
     </tr>
     ${CASE_FILE.map(r=>`<tr>
       <td style="${td}">${r.item}</td>
-      <td style="text-align:right; ${td}">$${fmt(r.paid)}</td>
-      <td style="text-align:right; ${td}">$${fmt(r.expense)}</td></tr>`).join('')}
+      <td class="amt" style="text-align:right; ${td}">$${fmt(r.paid)}</td>
+      <td class="amt" style="text-align:right; ${td}">$${fmt(r.expense)}</td></tr>`).join('')}
   </table></div>`;
 }
 
@@ -2280,9 +2271,9 @@ function caseFilePanelHTML(updated){
     </tr>
     ${CASE_FILE.map((r,i)=>`<tr>
       <td style="${td}">${r.item}</td>
-      <td style="text-align:right; ${td}">$${fmt(r.paid)}</td>
-      <td style="text-align:right; ${td} ${jay}">$${fmt(r.paid)}</td>
-      <td style="text-align:right; ${td}">$${fmt(r.expense)}</td>
+      <td class="amt" style="text-align:right; ${td}">$${fmt(r.paid)}</td>
+      <td class="amt" style="text-align:right; ${td} ${jay}">$${fmt(r.paid)}</td>
+      <td class="amt" style="text-align:right; ${td}">$${fmt(r.expense)}</td>
       ${updated ? `<td style="text-align:right; ${td}">${CASE_UPDATED[i]}</td>` : ''}</tr>`).join('')}
     </table></div></div></details>`;
 }
@@ -3933,6 +3924,41 @@ function renderL3Closing(container){
     {who:'jay', time:'9:44 AM', text:'teach me the Decoder tmr pls 🙏'}
   ], 2);
 }
+
+/* ============================== AMOUNTS NEVER WRAP ==============================
+   Every figure with a space as thousands separator ("2 400", "S$609 000") gets a non-breaking space,
+   wherever it appears (static text, feedback messages, dropdown options, dynamic updates). A
+   MutationObserver fixes text as it is added, so no individual message needs to remember. Typed
+   input values and textareas are left alone. */
+const AMT_RE = /(\d) (\d{3})(?!\d)/g;
+function nbspText(t){
+  let prev;
+  do { prev = t; t = t.replace(AMT_RE, '$1 $2'); } while(t !== prev);
+  return t;
+}
+function nbspFixText(n){
+  const v = nbspText(n.nodeValue);
+  if(v !== n.nodeValue) n.nodeValue = v;
+}
+const NBSP_SKIP = {SCRIPT:1, STYLE:1, TEXTAREA:1};
+function nbspFixNode(n){
+  if(n.nodeType === 3){ if(!(n.parentNode && NBSP_SKIP[n.parentNode.tagName])) nbspFixText(n); return; }
+  if(n.nodeType !== 1 || NBSP_SKIP[n.tagName]) return;
+  const w = document.createTreeWalker(n, NodeFilter.SHOW_TEXT, null);
+  let t;
+  while((t = w.nextNode())){ if(!NBSP_SKIP[t.parentNode.tagName]) nbspFixText(t); }
+}
+(function setupNbsp(){
+  try{
+    new MutationObserver(muts=>{
+      muts.forEach(m=>{
+        if(m.type === 'characterData'){ nbspFixNode(m.target); return; }
+        m.addedNodes.forEach(nbspFixNode);
+      });
+    }).observe(document.body, {childList:true, subtree:true, characterData:true});
+    nbspFixNode(document.body);
+  }catch(e){ /* very old browser: figures simply stay as they are */ }
+})();
 
 /* ============================== INIT ============================== */
 
